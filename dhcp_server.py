@@ -15,14 +15,14 @@ import subprocess
 import socket
 import ipaddress
 from dhcppython.packet import DHCPPacket
-from dhcppython.options import DHCPMessageType, SubnetMask, Router, DomainNameServer, IPAddressLeaseTime, ServerIdentifier
-from datatypes import LeaseTable
+from dhcppython.options import MessageType, SubnetMask, Router, DNSServer, IPAddressLeaseTime, ServerIdentifier
+from lib.datatypes import LeaseTable
 
 class RougeDHCPServer(object):
     """ DHCP server object
     """
 
-    def __init__(self, server_ip, subnet_mask, dns_server, lease_pool, lease_ttl, laddr, lport, logger=logger):
+    def __init__(self, server_ip, subnet_mask, dns_server, lease_pool, lease_ttl, laddr="", lport=67, logger=None):
         """ Initialize the object
         """
         # Store arguments locally
@@ -33,11 +33,12 @@ class RougeDHCPServer(object):
         self.lease_ttl = lease_ttl
         self.laddr = laddr
         self.lport = lport
+        self.logger = logger
 
         # Initialize lease table
         self.pool_start = ipaddress.IPv4Address(self.lease_pool[0])
         self.pool_end = ipaddress.IPv4Address(self.lease_pool[1])
-        self.lease_table = LeaseTable(self.pool_start, self.pool_end, self.lease_ttl)
+        self.lease_table = LeaseTable(self.pool_start, self.pool_end, self.lease_ttl, logger=self.logger)
 
         # Initialize the socket
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -54,10 +55,10 @@ class RougeDHCPServer(object):
             yiaddr=yiaddr
         )
         reply.options = [
-            DHCPMessageType(msg_type),
+            MessageType(msg_type),
             SubnetMask(self.subnet_mask),
             Router(self.server_ip),
-            DomainNameServer(self.dns_server),
+            DNSServer(self.dns_server),
             IPAddressLeaseTime(self.lease_ttl),
             ServerIdentifier(self.server_ip),
         ]
@@ -66,10 +67,8 @@ class RougeDHCPServer(object):
     def handle_packet(self, data):
         """ Handle the packet
         """
-        def get_or_assign_ip
-
         pkt = DHCPPacket.from_bytes(data)
-        msg = pkt.get_options(DHCPMessageType)
+        msg = pkt.get_options(MessageType)
         if not msg:
             return None
 
@@ -80,21 +79,21 @@ class RougeDHCPServer(object):
         ############################
         # HANDLE DISCOVER MESSAGES #
         ############################
-        if msg.value == DHCPMessageType.DISCOVER:
+        if msg.value == MessageType.DISCOVER:
             ip = self.lease_table.get_or_assign_ip(mac, requested_ip)
             if not ip:
                 return None
-            return self.build_reply(pkt, DHCPMessageType.OFFER, ip)
+            return self.build_reply(pkt, MessageType.OFFER, ip)
 
         ###########################
         # HANDLE REQUEST MESSAGES #
         ###########################
-        if msg.value == DHCPMessageType.REQUEST:
+        if msg.value == MessageType.REQUEST:
             ip = self.lease_table.get_or_assign_ip(mac, requested_ip)
             if not ip:
                 return None
             self.lease_table.leases[mac]["expires"] = time.time() + self.lease_ttl
-            return self.build_reply(pkt, DHCPMessageType.ACK, ip)
+            return self.build_reply(pkt, MessageType.ACK, ip)
 
         return None
 
@@ -112,7 +111,7 @@ class RougeDHCPServer(object):
 if __name__ == "__main__":
     # Read the configuration file
     config = configparser.ConfigParser()
-    config.read(sys.argv[1:])
+    config.read(sys.argv[1])
 
     # Set up the logger
     logging.basicConfig(
@@ -123,11 +122,20 @@ if __name__ == "__main__":
     logger.info(f"[DHCP Server] Initializing DHCP server component...")
 
     # Start the DHCP server
+    lease_pool = config["DHCP"]["lease_pool"].split(",")
     server = RougeDHCPServer(
         config["DHCP"]["server_ip"],
         config["DHCP"]["subnet_mask"],
         config["DHCP"]["dns_server"],
-        config["DHCP"]["lease_pool"],
-        config["DHCP"]["lease_ttl"]
+        lease_pool,
+        config["DHCP"]["lease_ttl"],
+        logger=logger
     )
-    server.start()
+    server.start() # TODO: MAKE THIS THREADED!!!!! Currently blocking SIGTERM listener
+
+    # Run until CTRL-C recieved
+    try:
+        while True:
+            pass
+    except KeyboardInterrupt:
+        logger.info(f"[DHCP Server] Keyboard interupt recieved, stopping DHCP server now.")
