@@ -18,7 +18,7 @@ from dhcppython.packet import DHCPPacket
 from dhcppython.options import MessageType, SubnetMask, Router, DNSServer, IPAddressLeaseTime, ServerIdentifier
 from lib.datatypes import LeaseTable
 
-class RougeDHCPServer(object):
+class ComponentDHCPServer(object):
     """ DHCP server object
     """
 
@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     # Start the DHCP server
     lease_pool = config["DHCP"]["lease_pool"].split(",")
-    server = RougeDHCPServer(
+    server = ComponentDHCPServer(
         config["DHCP"]["server_ip"],
         config["DHCP"]["subnet_mask"],
         config["DHCP"]["dns_server"],
