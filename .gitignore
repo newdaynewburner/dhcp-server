@@ -1,6 +1,7 @@
 # Project
 TODO.txt
 test/
+.old/
 
 # Python
 *.pyc
