@@ -43,10 +43,6 @@ class DnsmasqConfigurationFileHandler(object):
         for setting in [
             f"interface={self.config['DHCP']['interface']}",
             f"bind-interfaces",
-            #f"port=0",
-            #f"log-dhcp",
-            #f"dhcp-leasefile={self.config['DHCP']['dnsmasq_lease_file']}",
-            #f"dhcp-option=3,{self.config['DHCP']['gateway']}",
             f"server={self.config['DHCP']['dns_server']}",
             f"dhcp-range={self.config['DHCP']['pool_start']},{self.config['DHCP']['pool_end']},{self.config['DHCP']['lease_time']}"
         ]:
@@ -83,3 +79,108 @@ class DnsmasqConfigurationFileHandler(object):
         if not os.path.isfile(self.config["DHCP"]["dnsmasq_config_file"]):
             raise Exception(f"Error writing dnsmasq configuration file to disk! File not found on filesystem!")
         return self.config["DHCP"]["dnsmasq_config_file"]
+
+class DHCPServer(object):
+    """ DHCP server
+    """
+
+    def __init__(self, config=None, logger=None):
+        """ Initialize the object
+        """
+        self.config = config
+        self.logger = logger
+        self._state = "not running"
+        self.dnsmasq_process = None
+
+    def _write_dnsmasq_config(self):
+        """ Write the dnsmasq configuration file
+        """
+        dnsmasq_config_file_handler = DnsmasqConfigurationFileHandler(config=self.config, logger=self.logger)
+        dnsmasq_config_file = dnsmasq_config_file_handler.generate_dnsmasq_config_file()
+        return dnsmasq_config_file
+
+    def _start_dhcp_server(self):
+        """ Start the dnsmasq process
+        """
+        dnsmasq_config_file = self._write_dnsmasq_config()
+        self.dnsmasq_process = subprocess.Popen(
+            [self.config["DHCP"]["dnsmasq_executable"], "-C", dnsmasq_config_file, "--keep-in-foreground"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        self.state = "running"
+        return None
+
+    def _stop_dhcp_server(self):
+        """ Stop the dnsmasq process
+        """
+        self.dnsmasq_process.terminate()
+        try:
+            self.dnsmasq_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.dnsmasq_process.kill()
+            self.dnsmasq_process.wait()
+        self.state = "not running"
+        return None
+
+    def _restart_dhcp_server(self):
+        """ Restart the dnsmasq process
+        """
+        self._stop_dhcp_server()
+        self._start_dhcp_server()
+        return None
+
+    def start(self):
+        """ Start the DHCP server
+        """
+        if self.state == "running":
+            raise exceptions.StateChangeError(f"DHCP server is already started!")
+        try:
+            self._start_dhcp_server()
+        except Exception as err_msg:
+            raise exceptions.StateChangeError(f"Encountered an exception when trying to start the DHCP server! Error message: {err_msg}")
+        return None
+
+    def stop(self):
+        """ Stop the DHCP server
+        """
+        if self.state == "not running":
+            raise exceptions.StateChangeError(f"DHCP server is already stopped!")
+        try:
+            self._stop_dhcp_server()
+        except Exception as err_msg:
+            raise exceptions.StateChangeError(f"Encountered an exception when trying to stop the DHCP server! Error message: {err_msg}")
+        return None
+
+    def restart(self):
+        """ Restart the DHCP server
+        """
+        if self.state == "not running":
+            raise exceptions.StateChangeError(f"DHCP server has not been started!")
+        try:
+            self._restart_dhcp_server()
+        except Exception as err_msg:
+            raise exceptions.StateChangeError(f"Encountered an exception when trying to restart the DHCP server! Error message: {err_msg}")
+        return None
+
+    def configure(self, setting, value):
+        """ Change the value of a configuration setting
+        """
+        if setting in (
+            "interface",
+            "pool_start",
+            "pool_end",
+            "lease_time",
+            "static_lease_file",
+            "gateway",
+            "dns_server",
+            "dnsmasq_executable",
+            "dnsmasq_config_file",
+            "dnsmasq_lease_file",
+            "dnsmasq_dhcp_script"
+        ):
+            self.config["DHCP"][setting] = value
+        else:
+            raise exceptions.ConfigurationError(f"Invalid setting '{setting}'!")
+        return None
