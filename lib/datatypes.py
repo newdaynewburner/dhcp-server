@@ -44,7 +44,8 @@ class DnsmasqConfigurationFileHandler(object):
         for setting in [
             f"interface={self.config['DHCP']['interface']}",
             f"bind-interfaces",
-            f"server={self.config['DHCP']['dns_server']}",
+            f"port=0",
+            f"dhcp-option=6,{self.config['DHCP']['dns_server']}",
             f"dhcp-range={self.config['DHCP']['pool_start']},{self.config['DHCP']['pool_end']},{self.config['DHCP']['lease_time']}",
             f"log-dhcp"
         ]:
