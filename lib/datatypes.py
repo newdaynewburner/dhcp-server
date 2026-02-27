@@ -6,6 +6,7 @@ Custom datatype definitions
 
 import os
 import sys
+import subprocess
 import ipaddress
 from . import exceptions
 
@@ -44,7 +45,8 @@ class DnsmasqConfigurationFileHandler(object):
             f"interface={self.config['DHCP']['interface']}",
             f"bind-interfaces",
             f"server={self.config['DHCP']['dns_server']}",
-            f"dhcp-range={self.config['DHCP']['pool_start']},{self.config['DHCP']['pool_end']},{self.config['DHCP']['lease_time']}"
+            f"dhcp-range={self.config['DHCP']['pool_start']},{self.config['DHCP']['pool_end']},{self.config['DHCP']['lease_time']}",
+            f"log-dhcp"
         ]:
             settings.append(setting)
 
@@ -89,7 +91,7 @@ class DHCPServer(object):
         """
         self.config = config
         self.logger = logger
-        self._state = "not running"
+        self.state = "not running"
         self.dnsmasq_process = None
 
     def _write_dnsmasq_config(self):
@@ -104,7 +106,7 @@ class DHCPServer(object):
         """
         dnsmasq_config_file = self._write_dnsmasq_config()
         self.dnsmasq_process = subprocess.Popen(
-            [self.config["DHCP"]["dnsmasq_executable"], "-C", dnsmasq_config_file, "--keep-in-foreground"],
+            [self.config["DHCP"]["dnsmasq_executable"], "-d", "--log-debug", "-C", dnsmasq_config_file, "--keep-in-foreground"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True

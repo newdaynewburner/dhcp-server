@@ -8,6 +8,8 @@ import os
 import sys
 import subprocess
 import threading
+import logging
+import configparser
 from pydbus import SystemBus
 from gi.repository import GLib
 from . import datatypes
@@ -93,10 +95,10 @@ class DHCPServerService(datatypes.DHCPServer):
     def State(self):
         return self.state
 
-def init_dbus_api(name=BUS_name, path=OBJECT_PATH, xml=INTERFACE_XML):
+def init_dbus_api(name=BUS_NAME, path=OBJECT_PATH, xml=INTERFACE_XML):
     """ Start the DBus API
     """
     bus = SystemBus()
-    bus.publish(name, (path, DHCPServerService, xml))
+    bus.publish(name, (path, DHCPServerService(), xml))
     GLib.MainLoop().run()
     return None

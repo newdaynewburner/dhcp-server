@@ -1,12 +1,13 @@
 #!/bin/sh
 
 APP_NAME="dhcpserverd"
-SOURCE_DIR="/usr/lib/rouge-access-point/components/${APP_NAME}"
-CONFIG_DIR="/etc/rouge-access-point/components/${APP_NAME}/config"
-RSC_DIR="/etc/rouge-access-point/components/${APP_NAME}/rsc"
+SOURCE_DIR="/usr/lib/rouge-access-point/components/dhcp-server"
+CONFIG_DIR="/etc/rouge-access-point/config/components/dhcp-server"
+RSC_DIR="/etc/rouge-access-point/rsc/components/dhcp-server"
 SYSTEMD_UNIT_TARGET="/etc/systemd/system/${APP_NAME}.service"
 SECURITY_POLICY_TARGET="/usr/share/dbus-1/system.d/org.dhcpserverd.DHCPServer.conf"
 BIN_TARGET="/usr/bin/${APP_NAME}"
+CLIENT_TARGET="/usr/bin/dhcpserverctl"
 
 # Make sure running as root
 if [[ "$EUID" -ne 0 ]]; then
@@ -27,9 +28,13 @@ cp -r dhcpserverd.py lib/ "${SOURCE_DIR}/"
 echo "Creating launcher script..."
 cat > "${BIN_TARGET}" <<EOF
 #!/bin/sh
-exec /usr/bin/env python3 ${SOURCE_DIR}/dhcpserverd.py "\$@"
+exec /usr/bin/env python3.11 ${SOURCE_DIR}/dhcpserverd.py "\$@"
 EOF
 chmod +x "${BIN_TARGET}"
+
+# Copy the client script
+cp dhcpserverctl.py "${CLIENT_TARGET}"
+chmod +x "${CLIENT_TARGET}"
 
 # Move the configuration file
 echo "Copying configuration file..."
